@@ -11,7 +11,7 @@ const DEFAULT_OPTIONS: Required<ParseOptions> = {
   defaultDuration: '5s',
   defaultResolution: '720p',
   defaultAspectRatio: '16:9',
-  defaultGenerateAudio: false,
+  defaultGenerateAudio: true,
 };
 
 /**
@@ -257,9 +257,12 @@ function extractParameters(
       else if (lower.includes('720p')) { resolution = '720p'; recognized = true; }
       else if (lower.includes('1080p')) { resolution = '1080p'; recognized = true; }
 
-      // Audio
-      if (lower.includes('audio') || lower.includes('voice') || lower.includes('sound')) {
-        generateAudio = !lower.includes('no-audio') && !lower.includes('no audio');
+      // Audio: default is ON; check for explicit no-audio or audio toggle
+      if (lower.includes('no-audio') || lower.includes('no audio') || lower.includes('audio off') || lower.includes('mute')) {
+        generateAudio = false;
+        recognized = true;
+      } else if (lower.includes('audio') || lower.includes('voice') || lower.includes('sound')) {
+        generateAudio = true;
         recognized = true;
       }
 

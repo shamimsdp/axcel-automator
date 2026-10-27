@@ -56,6 +56,16 @@ export interface QueueConfig {
   filenamePattern: string; // e.g. "{index}_{title}_{id}"
 }
 
+export interface ScheduledBatch {
+  id: string;
+  name: string;
+  scheduledFor: number; // Unix timestamp ms
+  createdAt: number;
+  prompts: PromptItem[];
+  status: 'scheduled' | 'running' | 'completed' | 'cancelled';
+  offPeakLabel: string; // e.g. "Tonight Off-Peak (2:00 AM)"
+}
+
 export interface ExtensionFile {
   name: string;
   path: string;

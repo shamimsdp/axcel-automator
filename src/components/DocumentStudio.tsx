@@ -160,7 +160,7 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
       duration: '30s',
       resolution: '1080p',
       aspectRatio: '16:9',
-      generateAudio: false,
+      generateAudio: true,
       charCount: 95,
       model: 'Seedance 2.5',
       generationMode: 'text-to-video',

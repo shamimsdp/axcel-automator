@@ -17,11 +17,15 @@ import {
   Layers,
   Sparkles,
   Image as ImageIcon,
+  CalendarClock,
+  Moon,
 } from 'lucide-react';
 import { PromptItem, QueueJob, LogEntry, GenerationHistoryEntry } from '../types';
 import { VideoQueueEngine, QueueState } from '../utils/queueEngine';
 import { SimulatorDashboard } from './SimulatorDashboard';
 import { GenerationHistoryList } from './GenerationHistoryList';
+import { BatchSchedulerModal } from './BatchSchedulerModal';
+import { ScheduledBatchHub } from './ScheduledBatchHub';
 
 interface LiveSimulatorProps {
   prompts: PromptItem[];

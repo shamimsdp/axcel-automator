@@ -1,4 +1,4 @@
-import { PromptItem, QueueConfig, QueueJob, GenerationHistoryEntry } from '../types';
+import { PromptItem, QueueConfig, QueueJob, GenerationHistoryEntry, ScheduledBatch } from '../types';
 
 export const DEFAULT_QUEUE_CONFIG: QueueConfig = {
   maxConcurrency: 2, // 2 simultaneous generations as per axcel support
@@ -17,6 +17,8 @@ export interface QueueState {
   failedCount: number;
   isRunning: boolean;
   isPaused: boolean;
+  scheduledBatches: ScheduledBatch[];
+  activeScheduledBatch?: ScheduledBatch;
 }
 
 export type StateListener = (state: QueueState) => void;
@@ -35,10 +37,15 @@ export class VideoQueueEngine {
   private logListeners: Set<LogListener> = new Set();
   private historyListeners: Set<HistoryListener> = new Set();
   private downloadDispatcher?: DownloadDispatcher;
-  private timerIds: NodeJS.Timeout[] = [];
+  private scheduledBatches: ScheduledBatch[] = [];
+  private activeScheduledBatchId?: string;
+  private scheduleCheckInterval?: NodeJS.Timeout;
 
   constructor(config: Partial<QueueConfig> = {}) {
     this.config = { ...DEFAULT_QUEUE_CONFIG, ...config };
+    this.scheduleCheckInterval = setInterval(() => {
+      this.checkScheduledBatches();
+    }, 1000);
   }
 
   public updateConfig(newConfig: Partial<QueueConfig>) {
@@ -115,6 +122,10 @@ export class VideoQueueEngine {
   public getState(): QueueState {
     const completedCount = this.jobs.filter(j => j.status === 'completed').length;
     const failedCount = this.jobs.filter(j => j.status === 'failed').length;
+    const activeScheduledBatch = this.scheduledBatches.find(
+      b => b.id === this.activeScheduledBatchId
+    ) || this.scheduledBatches.find(b => b.status === 'scheduled');
+
     return {
       jobs: [...this.jobs],
       activeCount: this.activeWorkers.size,
@@ -122,7 +133,92 @@ export class VideoQueueEngine {
       failedCount,
       isRunning: this.isRunning,
       isPaused: this.isPaused,
+      scheduledBatches: [...this.scheduledBatches],
+      activeScheduledBatch,
     };
+  }
+
+  /**
+   * Schedules a batch to run automatically at a specific timestamp during off-peak hours
+   */
+  public scheduleBatch(
+    scheduledFor: number,
+    offPeakLabel: string,
+    prompts: PromptItem[],
+    name?: string
+  ): ScheduledBatch {
+    const id = `sched-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const batchName = name || `Batch #${this.scheduledBatches.length + 1} (${prompts.length} videos)`;
+    const newBatch: ScheduledBatch = {
+      id,
+      name: batchName,
+      scheduledFor,
+      createdAt: Date.now(),
+      prompts: [...prompts],
+      status: 'scheduled',
+      offPeakLabel,
+    };
+
+    this.scheduledBatches.push(newBatch);
+    const dateStr = new Date(scheduledFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.log(
+      'info',
+      `📅 Queued off-peak batch "${batchName}" scheduled for ${dateStr} (${offPeakLabel}).`
+    );
+    this.notify();
+    return newBatch;
+  }
+
+  public cancelScheduledBatch(id: string): void {
+    const batch = this.scheduledBatches.find(b => b.id === id);
+    if (!batch) return;
+    batch.status = 'cancelled';
+    this.log('warn', `Scheduled batch "${batch.name}" was cancelled.`);
+    if (this.activeScheduledBatchId === id) {
+      this.activeScheduledBatchId = undefined;
+    }
+    this.notify();
+  }
+
+  public runScheduledBatchNow(id: string): void {
+    const batch = this.scheduledBatches.find(b => b.id === id);
+    if (!batch) return;
+    this.log('info', `⚡ Immediately triggering scheduled batch "${batch.name}" (skipping off-peak delay).`);
+    this.triggerScheduledBatch(batch);
+  }
+
+  public checkScheduledBatches(): void {
+    if (this.isRunning) return;
+
+    const now = Date.now();
+    const readyBatch = this.scheduledBatches.find(
+      b => b.status === 'scheduled' && now >= b.scheduledFor
+    );
+
+    if (readyBatch) {
+      this.triggerScheduledBatch(readyBatch);
+    }
+  }
+
+  private triggerScheduledBatch(batch: ScheduledBatch): void {
+    batch.status = 'running';
+    this.activeScheduledBatchId = batch.id;
+    this.log(
+      'success',
+      `⏰ Off-peak trigger reached! Auto-starting batch "${batch.name}" with ${batch.prompts.length} videos [Seedance 2.5, Audio ON]...`
+    );
+    this.loadPrompts(batch.prompts);
+    this.start();
+  }
+
+  public clearScheduledBatches(): void {
+    this.scheduledBatches = [];
+    this.activeScheduledBatchId = undefined;
+    this.notify();
+  }
+
+  public getScheduledBatches(): ScheduledBatch[] {
+    return [...this.scheduledBatches];
   }
 
   public loadPrompts(prompts: PromptItem[]): void {
@@ -182,6 +278,13 @@ export class VideoQueueEngine {
     this.activeWorkers.clear();
     this.log('warn', 'Queue processing stopped by user.');
     this.notify();
+  }
+
+  public destroy(): void {
+    this.stop();
+    if (this.scheduleCheckInterval) {
+      clearInterval(this.scheduleCheckInterval);
+    }
   }
 
   public retryJob(jobId: string): void {
@@ -246,8 +349,18 @@ export class VideoQueueEngine {
 
         if (pendingCount === 0 && this.activeWorkers.size === 0 && this.jobs.length > 0) {
           this.isRunning = false;
+          if (this.activeScheduledBatchId) {
+            const activeBatch = this.scheduledBatches.find(b => b.id === this.activeScheduledBatchId);
+            if (activeBatch) {
+              activeBatch.status = 'completed';
+              this.log('success', `🎉 Scheduled off-peak batch "${activeBatch.name}" completed successfully!`);
+            }
+            this.activeScheduledBatchId = undefined;
+          }
           this.log('success', 'All batch video tasks have finished processing!');
           this.notify();
+          // Check if another scheduled batch is queued up
+          this.checkScheduledBatches();
         }
         break;
       }
