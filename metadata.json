@@ -1,0 +1,6 @@
+{
+  "name": "Axcel Video Automator",
+  "description": "Chrome extension generator and batch automation studio for axcel.cloud text-to-video generation with auto-retry and video downloading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
