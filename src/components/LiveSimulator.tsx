@@ -16,6 +16,7 @@ import {
   Activity,
   Layers,
   Sparkles,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { PromptItem, QueueJob, LogEntry, GenerationHistoryEntry } from '../types';
 import { VideoQueueEngine, QueueState } from '../utils/queueEngine';
@@ -260,13 +261,34 @@ export const LiveSimulator: React.FC<LiveSimulatorProps> = ({
                   style={{ width: `${worker1Job.progress}%` }}
                 />
               </div>
+
+              {worker1Job.promptItem.referenceImage && (
+                <div className="flex items-center gap-2 rounded-md border border-indigo-500/30 bg-indigo-950/30 p-1.5 text-[10px]">
+                  <img
+                    src={worker1Job.promptItem.referenceImage}
+                    alt="Ref"
+                    className="h-8 w-12 rounded object-cover border border-zinc-700 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="font-semibold text-indigo-300">Image to Video</span>
+                    <p className="text-zinc-400 truncate font-mono text-[9px]">
+                      {worker1Job.promptItem.referenceImageName || 'reference.png'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <p className="text-[11px] text-zinc-400 line-clamp-2 italic">
                 "{worker1Job.promptItem.prompt}"
               </p>
-              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
-                <span>{worker1Job.promptItem.aspectRatio}</span>
+              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono flex-wrap">
+                <span className="text-zinc-300 font-semibold">{worker1Job.promptItem.model || 'Seedance 2.5'}</span>
                 <span>•</span>
-                <span>{worker1Job.promptItem.duration}</span>
+                <span className={worker1Job.promptItem.duration === '30s' ? 'text-amber-400 font-bold' : ''}>
+                  {worker1Job.promptItem.duration}
+                </span>
+                <span>•</span>
+                <span>{worker1Job.promptItem.aspectRatio}</span>
                 <span>•</span>
                 <span>{worker1Job.promptItem.resolution}</span>
               </div>
@@ -311,13 +333,34 @@ export const LiveSimulator: React.FC<LiveSimulatorProps> = ({
                   style={{ width: `${worker2Job.progress}%` }}
                 />
               </div>
+
+              {worker2Job.promptItem.referenceImage && (
+                <div className="flex items-center gap-2 rounded-md border border-indigo-500/30 bg-indigo-950/30 p-1.5 text-[10px]">
+                  <img
+                    src={worker2Job.promptItem.referenceImage}
+                    alt="Ref"
+                    className="h-8 w-12 rounded object-cover border border-zinc-700 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="font-semibold text-indigo-300">Image to Video</span>
+                    <p className="text-zinc-400 truncate font-mono text-[9px]">
+                      {worker2Job.promptItem.referenceImageName || 'reference.png'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <p className="text-[11px] text-zinc-400 line-clamp-2 italic">
                 "{worker2Job.promptItem.prompt}"
               </p>
-              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
-                <span>{worker2Job.promptItem.aspectRatio}</span>
+              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono flex-wrap">
+                <span className="text-zinc-300 font-semibold">{worker2Job.promptItem.model || 'Seedance 2.5'}</span>
                 <span>•</span>
-                <span>{worker2Job.promptItem.duration}</span>
+                <span className={worker2Job.promptItem.duration === '30s' ? 'text-amber-400 font-bold' : ''}>
+                  {worker2Job.promptItem.duration}
+                </span>
+                <span>•</span>
+                <span>{worker2Job.promptItem.aspectRatio}</span>
                 <span>•</span>
                 <span>{worker2Job.promptItem.resolution}</span>
               </div>
@@ -391,11 +434,28 @@ export const LiveSimulator: React.FC<LiveSimulatorProps> = ({
                       }`}>
                         {job.status === 'retrying' ? `Retrying (${job.attemptCount}/3)` : job.status}
                       </span>
+                      {job.promptItem.referenceImage && (
+                        <span className="rounded bg-indigo-500/20 border border-indigo-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-300">
+                          Img2Vid
+                        </span>
+                      )}
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {job.promptItem.model || 'Seedance 2.5'} • {job.promptItem.duration}
+                      </span>
                     </div>
 
-                    <p className="mt-1 text-zinc-400 truncate text-[11px]">
-                      {job.promptItem.prompt}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {job.promptItem.referenceImage && (
+                        <img
+                          src={job.promptItem.referenceImage}
+                          alt="Ref"
+                          className="h-6 w-9 rounded object-cover border border-zinc-700 shrink-0"
+                        />
+                      )}
+                      <p className="text-zinc-400 truncate text-[11px] flex-1">
+                        {job.promptItem.prompt}
+                      </p>
+                    </div>
 
                     {job.error && (
                       <p className="mt-1 text-[11px] text-red-400 truncate">

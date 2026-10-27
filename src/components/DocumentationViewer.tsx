@@ -11,7 +11,7 @@ export const DocumentationViewer: React.FC = () => {
           <span>Axcel Studio Text-to-Video Technical Documentation</span>
         </h2>
         <p className="mt-2 text-xs leading-relaxed text-zinc-300">
-          This reference compiles the live architecture, DOM selectors, concurrency limits, and retry policies for <b>axcel.cloud/video/text-to-video</b> implemented by the Chrome Extension.
+          This reference compiles the live architecture, DOM selectors, concurrency limits, and retry policies for <b>axcel.cloud/video/text-to-video</b> and <b>axcel.cloud/video/image-to-video</b> implemented by the Chrome Extension.
         </p>
       </div>
 
@@ -26,12 +26,12 @@ export const DocumentationViewer: React.FC = () => {
           <div className="mt-4 space-y-3 text-xs">
             <div>
               <span className="font-semibold text-zinc-300">AI Models:</span>
-              <p className="text-zinc-400">Seedance 2.0 (Default), Seedance 2.5</p>
+              <p className="text-zinc-400">Seedance 2.5 (Supports 30s duration), Seedance 2.0</p>
             </div>
             <div>
               <span className="font-semibold text-zinc-300">Durations:</span>
               <div className="mt-1 flex flex-wrap gap-1 font-mono text-[11px]">
-                {['5s', '8s', '10s', '12s', '15s'].map(d => (
+                {['5s', '8s', '10s', '12s', '15s', '30s (Seedance 2.5)'].map(d => (
                   <span key={d} className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-300">{d}</span>
                 ))}
               </div>

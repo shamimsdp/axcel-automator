@@ -1,7 +1,8 @@
 export type AspectRatio = '16:9' | '9:16' | '1:1' | '3:4' | '4:3' | '21:9';
-export type VideoDuration = '5s' | '8s' | '10s' | '12s' | '15s';
+export type VideoDuration = '5s' | '8s' | '10s' | '12s' | '15s' | '30s';
 export type VideoResolution = '480p' | '720p' | '1080p';
-export type VideoModel = 'Seedance 2.0' | 'Seedance 2.5';
+export type VideoModel = 'Seedance 2.5' | 'Seedance 2.0';
+export type GenerationMode = 'text-to-video' | 'image-to-video';
 
 export interface PromptItem {
   id: string;
@@ -13,6 +14,10 @@ export interface PromptItem {
   aspectRatio: AspectRatio;
   generateAudio: boolean;
   charCount: number;
+  model?: VideoModel;
+  generationMode?: GenerationMode;
+  referenceImage?: string; // Data URL, image URL, or base64
+  referenceImageName?: string;
 }
 
 export type JobStatus =
@@ -86,5 +91,9 @@ export interface GenerationHistoryEntry {
     resolution: VideoResolution;
     aspectRatio: AspectRatio;
     generateAudio: boolean;
+    model?: VideoModel;
+    generationMode?: GenerationMode;
+    referenceImage?: string;
+    referenceImageName?: string;
   };
 }

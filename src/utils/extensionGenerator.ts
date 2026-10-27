@@ -7,8 +7,8 @@ export const EXTENSION_MANIFEST = JSON.stringify(
     manifest_version: 3,
     name: 'Axcel.cloud Auto Video Generator & Downloader',
     short_name: 'AxcelAutomator',
-    version: '1.0.0',
-    description: 'Automates batch text-to-video generation on axcel.cloud from markdown/docs with concurrency control, auto-retry, and auto-downloading.',
+    version: '1.1.0',
+    description: 'Automates batch text-to-video & image-to-video generation on axcel.cloud with Seedance 2.5 (30s duration), reference image upload, concurrency control, auto-retry, and auto-downloading.',
     permissions: ['storage', 'downloads', 'activeTab'],
     host_permissions: ['https://axcel.cloud/*'],
     background: {
@@ -30,7 +30,12 @@ export const EXTENSION_MANIFEST = JSON.stringify(
     },
     content_scripts: [
       {
-        matches: ['https://axcel.cloud/video/text-to-video*', 'https://axcel.cloud/*'],
+        matches: [
+          'https://axcel.cloud/video/text-to-video*',
+          'https://axcel.cloud/video/image-to-video*',
+          'https://axcel.cloud/video/*',
+          'https://axcel.cloud/*'
+        ],
         js: ['content.js'],
         css: ['content.css'],
         run_at: 'document_idle',
@@ -132,6 +137,10 @@ export const EXTENSION_CONTENT_JS = `/**
     filenamePattern: '{index}_{title}',
   };
 
+  // Current Page Mode detection
+  const isImageToVideo = window.location.href.includes('image-to-video');
+  const pageMode = isImageToVideo ? 'Image to Video' : 'Text to Video';
+
   // Restore stored state
   chrome.storage.local.get(['axcel_queue', 'axcel_config'], data => {
     if (data.axcel_config) config = { ...config, ...data.axcel_config };
@@ -152,6 +161,10 @@ export const EXTENSION_CONTENT_JS = `/**
         resolution: p.resolution || '720p',
         aspectRatio: p.aspectRatio || '16:9',
         generateAudio: !!p.generateAudio,
+        model: p.model || (p.duration === '30s' ? 'Seedance 2.5' : 'Seedance 2.5'),
+        generationMode: p.referenceImage ? 'image-to-video' : (isImageToVideo ? 'image-to-video' : 'text-to-video'),
+        referenceImage: p.referenceImage || null,
+        referenceImageName: p.referenceImageName || null,
         status: 'pending',
         attemptCount: 0,
         progress: 0,
@@ -170,7 +183,7 @@ export const EXTENSION_CONTENT_JS = `/**
       stopAutomation();
       sendResponse({ success: true });
     } else if (req.action === 'GET_STATE') {
-      sendResponse({ queue, isRunning, isPaused, activeWorkers, config });
+      sendResponse({ queue, isRunning, isPaused, activeWorkers, config, isImageToVideo, pageMode });
     }
   });
 
@@ -347,11 +360,23 @@ export const EXTENSION_CONTENT_JS = `/**
     updateWidgetUI();
 
     try {
-      // Step 1: Fill the prompt into the Angular textarea
+      // Step 1: Upload reference image if present (Image-to-Video mode)
+      if (job.referenceImage) {
+        log(\`[Worker \${activeWorkers}] Attaching reference image for Scene \${job.index}...\`, 'info');
+        const imgSuccess = await uploadReferenceImage(job.referenceImage, job.referenceImageName || 'reference.png');
+        if (imgSuccess) {
+          log('Reference image attached successfully.', 'info');
+          await sleep(800);
+        } else {
+          log('Reference image uploader not found; continuing with prompt...', 'warn');
+        }
+      }
+
+      // Step 2: Fill the prompt into the Angular textarea
       await fillPromptTextarea(job.prompt);
       await sleep(500);
 
-      // Step 2: Configure parameters (duration, resolution, aspect ratio, audio)
+      // Step 3: Configure parameters (duration, resolution, aspect ratio, audio)
       await configureParameters(job);
       await sleep(500);
 
@@ -406,6 +431,42 @@ export const EXTENSION_CONTENT_JS = `/**
   }
 
   // --- DOM Automation Helpers ---
+  async function uploadReferenceImage(imageSrc, filename = 'reference.png') {
+    try {
+      const fileInput = document.querySelector('input[type="file"][accept*="image"]') ||
+                         document.querySelector('.upload-box input[type="file"]') ||
+                         document.querySelector('input[type="file"]');
+      if (!fileInput) return false;
+
+      let blob;
+      if (imageSrc.startsWith('data:')) {
+        const parts = imageSrc.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        blob = new Blob([u8arr], { type: mime });
+      } else {
+        const res = await fetch(imageSrc);
+        blob = await res.blob();
+      }
+
+      const file = new File([blob], filename, { type: blob.type || 'image/png' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    } catch (e) {
+      console.warn('[Axcel Automator] Image injection error:', e);
+      return false;
+    }
+  }
+
   async function fillPromptTextarea(text) {
     const textarea = document.querySelector('.prompt-box textarea') || document.querySelector('textarea');
     if (!textarea) throw new Error('Could not find prompt textarea on page.');
@@ -424,7 +485,23 @@ export const EXTENSION_CONTENT_JS = `/**
   }
 
   async function configureParameters(job) {
-    // Select boxes for Duration, Resolution, Aspect Ratio
+    // 1. Model Selection (Seedance 2.5 vs Seedance 2.0)
+    const targetModel = job.model || (job.duration === '30s' ? 'Seedance 2.5' : null);
+    if (targetModel) {
+      const modelTrigger = Array.from(document.querySelectorAll('select, button, [role="combobox"]')).find(el => {
+        const t = (el.innerText || el.textContent || '').trim();
+        return t.includes('Seedance') || el.getAttribute('aria-label')?.includes('Model');
+      });
+      if (modelTrigger && modelTrigger.tagName === 'SELECT') {
+        const opt = Array.from(modelTrigger.options).find(o => o.text.includes(targetModel));
+        if (opt && modelTrigger.value !== opt.value) {
+          modelTrigger.value = opt.value;
+          modelTrigger.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }
+
+    // 2. Select boxes for Duration (including 30s), Resolution, Aspect Ratio
     const selects = Array.from(document.querySelectorAll('select'));
     for (const sel of selects) {
       const options = Array.from(sel.options).map(o => o.text.trim());
@@ -440,7 +517,7 @@ export const EXTENSION_CONTENT_JS = `/**
       }
     }
 
-    // Audio switch toggle
+    // 3. Audio switch toggle
     if (job.generateAudio !== undefined) {
       const audioSwitch = document.querySelector('button.switch') || document.querySelector('[role="switch"]');
       if (audioSwitch) {
@@ -996,24 +1073,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 export const EXTENSION_README_MD = `# Axcel.cloud Auto Video Generator & Downloader (Chrome Extension)
 
-This Chrome Extension automates batch video creation on **[https://axcel.cloud/video/text-to-video](https://axcel.cloud/video/text-to-video)** from your Markdown (.md), Word/Docs, or Text files.
+This Chrome Extension automates batch video creation on **[https://axcel.cloud/video/text-to-video](https://axcel.cloud/video/text-to-video)** AND **[https://axcel.cloud/video/image-to-video](https://axcel.cloud/video/image-to-video)** from your Markdown (.md), Word/Docs (.docx), or Text scripts.
 
 ---
 
 ## Key Features
 
-1. **Batch Video Creation from .md/.doc files**:
-   - Parses scenes, titles, and prompts automatically.
-   - Respects Axcel's batch capacity (up to 10 videos per batch).
-2. **2-Video Simultaneous Concurrency**:
-   - Automatically maintains 2 active video generations running concurrently.
-   - Feeds the next item into the pipeline as soon as one completes.
-3. **Automatic Retry on Failure**:
-   - If an Axcel generation times out or fails (e.g., transient network hiccup, rate limit, "Gagal menyiapkan video"), the extension automatically waits and retries up to 3 times before moving on.
-4. **Automatic Video Downloads**:
-   - Automatically detects the completed video URL and downloads it using Chrome's Downloads API with custom naming (\`01_Scene_Title.mp4\`).
-5. **In-Page Floating HUD**:
-   - Displays a live status widget directly in the corner of Axcel Studio with progress bars, active worker count, and controls.
+1. **Dual Injected Pages**:
+   - Injected on **Text-to-Video**: \`https://axcel.cloud/video/text-to-video\`
+   - Injected on **Image-to-Video**: \`https://axcel.cloud/video/image-to-video\`
+2. **Seedance 2.5 (30s Duration) Support**:
+   - Full support for the newest **Seedance 2.5** model with extended **30s video duration** alongside 5s, 8s, 10s, 12s, 15s.
+3. **Reference Image Upload for Image-to-Video**:
+   - Automatically attaches reference images to Axcel's file uploader using native DataTransfer events.
+4. **2-Video Simultaneous Concurrency & Batch Limit**:
+   - Maintains 2 active generations concurrently while queuing up to 10 scenes per batch.
+5. **Automatic Retry on Failure**:
+   - Waits and automatically retries transient timeouts, rate limits, or "Gagal menyiapkan video" up to 3 times.
+6. **Automatic Video Downloads**:
+   - Detects the completed MP4 stream and automatically saves it using Chrome's Downloads API with custom naming (\`01_Scene_Title.mp4\`).
+7. **In-Page Floating HUD**:
+   - Shows live progress, worker slots (0/2), current mode (Text vs Image to Video), and log telemetry.
 
 ---
 
@@ -1024,7 +1104,7 @@ This Chrome Extension automates batch video creation on **[https://axcel.cloud/v
 3. Toggle on **"Developer mode"** in the top right corner.
 4. Click the **"Load unpacked"** button in the top left.
 5. Select the extracted extension directory (containing \`manifest.json\`).
-6. Open **\`https://axcel.cloud/video/text-to-video\`** and make sure you are signed in.
+6. Open **\`https://axcel.cloud/video/text-to-video\`** or **\`https://axcel.cloud/video/image-to-video\`** and make sure you are signed in.
 7. Click the **Axcel Automator** icon in your Chrome toolbar or use the in-page floating widget!
 `;
 

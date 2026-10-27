@@ -1,4 +1,4 @@
-import { AspectRatio, PromptItem, VideoDuration, VideoResolution } from '../types';
+import { AspectRatio, PromptItem, VideoDuration, VideoResolution, VideoModel, GenerationMode } from '../types';
 
 export interface ParseOptions {
   defaultDuration?: VideoDuration;
@@ -153,12 +153,31 @@ function parseSingleBlock(
 
   if (!prompt) return null;
 
-  // Extract inline parameter overrides, e.g. [16:9, 10s, 1080p, audio]
+  // Extract reference image if present: ![alt](url) or [image: url]
+  let referenceImage: string | undefined;
+  let referenceImageName: string | undefined;
+
+  const imgMatch = prompt.match(/!\[(.*?)\]\((.*?)\)/);
+  if (imgMatch) {
+    referenceImageName = imgMatch[1] || 'reference.png';
+    referenceImage = imgMatch[2];
+    prompt = prompt.replace(imgMatch[0], '').trim();
+  }
+
+  // Extract inline parameter overrides, e.g. [16:9, 30s, 1080p, audio, Seedance 2.5]
   const tagExtract = extractParameters(prompt, opts);
   prompt = tagExtract.cleanedPrompt;
 
+  if (!referenceImage && tagExtract.referenceImage) {
+    referenceImage = tagExtract.referenceImage;
+    referenceImageName = tagExtract.referenceImageName;
+  }
+
   // Remove markdown bold/italic decorators if any
   prompt = prompt.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+
+  const model: VideoModel = tagExtract.model || (tagExtract.duration === '30s' ? 'Seedance 2.5' : 'Seedance 2.5');
+  const generationMode: GenerationMode = referenceImage ? 'image-to-video' : 'text-to-video';
 
   return {
     id: `prompt-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -170,6 +189,10 @@ function parseSingleBlock(
     aspectRatio: tagExtract.aspectRatio,
     generateAudio: tagExtract.generateAudio,
     charCount: prompt.length,
+    model,
+    generationMode,
+    referenceImage,
+    referenceImageName,
   };
 }
 
@@ -182,11 +205,17 @@ function extractParameters(
   resolution: VideoResolution;
   aspectRatio: AspectRatio;
   generateAudio: boolean;
+  model?: VideoModel;
+  referenceImage?: string;
+  referenceImageName?: string;
 } {
   let duration = opts.defaultDuration;
   let resolution = opts.defaultResolution;
   let aspectRatio = opts.defaultAspectRatio;
   let generateAudio = opts.defaultGenerateAudio;
+  let model: VideoModel | undefined;
+  let referenceImage: string | undefined;
+  let referenceImageName: string | undefined;
 
   let cleaned = prompt;
 
@@ -194,32 +223,51 @@ function extractParameters(
   const bracketMatches = prompt.match(/\\?\[(.*?)\\?\]/g);
   if (bracketMatches) {
     for (const match of bracketMatches) {
-      const inner = match.replace(/^\\?\[/, '').replace(/\\?\]$/, '').toLowerCase();
+      const inner = match.replace(/^\\?\[/, '').replace(/\\?\]$/, '').trim();
+      const lower = inner.toLowerCase();
       let recognized = false;
 
       // Aspect Ratio
-      if (inner.includes('16:9')) { aspectRatio = '16:9'; recognized = true; }
-      else if (inner.includes('9:16')) { aspectRatio = '9:16'; recognized = true; }
-      else if (inner.includes('1:1')) { aspectRatio = '1:1'; recognized = true; }
-      else if (inner.includes('3:4')) { aspectRatio = '3:4'; recognized = true; }
-      else if (inner.includes('4:3')) { aspectRatio = '4:3'; recognized = true; }
-      else if (inner.includes('21:9')) { aspectRatio = '21:9'; recognized = true; }
+      if (lower.includes('16:9')) { aspectRatio = '16:9'; recognized = true; }
+      else if (lower.includes('9:16')) { aspectRatio = '9:16'; recognized = true; }
+      else if (lower.includes('1:1')) { aspectRatio = '1:1'; recognized = true; }
+      else if (lower.includes('3:4')) { aspectRatio = '3:4'; recognized = true; }
+      else if (lower.includes('4:3')) { aspectRatio = '4:3'; recognized = true; }
+      else if (lower.includes('21:9')) { aspectRatio = '21:9'; recognized = true; }
 
-      // Duration
-      if (/\b5s\b/.test(inner)) { duration = '5s'; recognized = true; }
-      else if (/\b8s\b/.test(inner)) { duration = '8s'; recognized = true; }
-      else if (/\b10s\b/.test(inner)) { duration = '10s'; recognized = true; }
-      else if (/\b12s\b/.test(inner)) { duration = '12s'; recognized = true; }
-      else if (/\b15s\b/.test(inner)) { duration = '15s'; recognized = true; }
+      // Duration: includes 30s (Seedance 2.5)
+      if (/\b30s\b/.test(lower)) { duration = '30s'; model = 'Seedance 2.5'; recognized = true; }
+      else if (/\b5s\b/.test(lower)) { duration = '5s'; recognized = true; }
+      else if (/\b8s\b/.test(lower)) { duration = '8s'; recognized = true; }
+      else if (/\b10s\b/.test(lower)) { duration = '10s'; recognized = true; }
+      else if (/\b12s\b/.test(lower)) { duration = '12s'; recognized = true; }
+      else if (/\b15s\b/.test(lower)) { duration = '15s'; recognized = true; }
+
+      // Model
+      if (lower.includes('seedance 2.5') || lower.includes('seedance2.5') || lower.includes('s2.5')) {
+        model = 'Seedance 2.5';
+        recognized = true;
+      } else if (lower.includes('seedance 2.0') || lower.includes('seedance2.0') || lower.includes('s2.0')) {
+        model = 'Seedance 2.0';
+        recognized = true;
+      }
 
       // Resolution
-      if (inner.includes('480p')) { resolution = '480p'; recognized = true; }
-      else if (inner.includes('720p')) { resolution = '720p'; recognized = true; }
-      else if (inner.includes('1080p')) { resolution = '1080p'; recognized = true; }
+      if (lower.includes('480p')) { resolution = '480p'; recognized = true; }
+      else if (lower.includes('720p')) { resolution = '720p'; recognized = true; }
+      else if (lower.includes('1080p')) { resolution = '1080p'; recognized = true; }
 
       // Audio
-      if (inner.includes('audio') || inner.includes('voice') || inner.includes('sound')) {
-        generateAudio = !inner.includes('no-audio') && !inner.includes('no audio');
+      if (lower.includes('audio') || lower.includes('voice') || lower.includes('sound')) {
+        generateAudio = !lower.includes('no-audio') && !lower.includes('no audio');
+        recognized = true;
+      }
+
+      // Inline image/ref tag, e.g. [image: https://...] or [ref: sample.png]
+      const imgTagMatch = inner.match(/^(?:image|ref|reference):\s*(.+)$/i);
+      if (imgTagMatch) {
+        referenceImage = imgTagMatch[1].trim();
+        referenceImageName = referenceImage.split('/').pop() || 'reference.png';
         recognized = true;
       }
 
@@ -235,14 +283,19 @@ function extractParameters(
     resolution,
     aspectRatio,
     generateAudio,
+    model,
+    referenceImage,
+    referenceImageName,
   };
 }
 
 export function exportPromptsToMarkdown(prompts: PromptItem[]): string {
   return prompts
     .map((p, idx) => {
-      const tags = `[${p.aspectRatio}, ${p.duration}, ${p.resolution}${p.generateAudio ? ', audio' : ''}]`;
-      return `## Scene ${idx + 1}: ${p.title}\n${tags}\n${p.prompt}\n`;
+      const modelTag = p.model ? `, ${p.model}` : '';
+      const tags = `[${p.aspectRatio}, ${p.duration}, ${p.resolution}${p.generateAudio ? ', audio' : ''}${modelTag}]`;
+      const imgLine = p.referenceImage ? `![${p.referenceImageName || 'Reference Image'}](${p.referenceImage})\n` : '';
+      return `## Scene ${idx + 1}: ${p.title}\n${tags}\n${imgLine}${p.prompt}\n`;
     })
     .join('\n---\n\n');
 }

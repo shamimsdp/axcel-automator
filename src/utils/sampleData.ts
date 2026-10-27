@@ -78,6 +78,31 @@ Misty morning sunrise bursting through emerald jungle leaves, vibrant scarlet ma
 Dramatic telephoto shot of dark basaltic lava cascading steadily down black volcanic rock into turbulent crashing ocean waves with thick billowing steam.`,
   },
   {
+    id: 'seedance-30s-img2vid',
+    name: 'Seedance 2.5 Image to Video (30s Extended)',
+    description: 'Demonstrates Seedance 2.5 with 30s video duration, reference image uploads, and image-to-video prompt flow.',
+    itemCount: 4,
+    content: `# Scene 1: Celestial Temple Guardian
+[16:9, 30s, 1080p, audio, Seedance 2.5]
+![guardian.png](https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&q=80)
+An ornate porcelain warrior statue slowly awakens with glowing golden glyphs as mystical cherry blossom petals swirl in the mountain wind, cinematic 30-second continuous motion with atmospheric sound.
+
+# Scene 2: Cybernetic Street Racer
+[16:9, 30s, 1080p, Seedance 2.5]
+![racer.png](https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80)
+Camera begins focused on the neon-lit reflection of an electric supercar, then smoothly tracks as it launches into a futuristic high-speed midnight drift through rainy city streets.
+
+# Scene 3: Deep Sea Ancient Ruins
+[21:9, 15s, 1080p, audio, Seedance 2.5]
+![abyss.png](https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80)
+A deep-sea submersible illuminates a forgotten underwater amphitheater overgrown with phosphorescent coral and schools of silver fish.
+
+# Scene 4: Golden Hour Alpine Flight
+[16:9, 30s, 1080p, audio, Seedance 2.5]
+![alpine.png](https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80)
+Magnificent 30-second fluid aerial gliding from snowcapped mountain peaks down into a shimmering turquoise glacial lake bathed in warm sunset hues.`,
+  },
+  {
     id: 'test-retry',
     name: 'Auto-Retry Verification Suite (3 Scenes)',
     description: 'Includes a scene engineered to demonstrate the auto-retry mechanism in the simulator.',

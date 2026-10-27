@@ -68,6 +68,36 @@ Golden retriever jumping into a pile of autumn leaves in slow motion.
   assert.equal(parsed.length, 1);
   const exported = exportPromptsToMarkdown(parsed);
   assert.match(exported, /## Scene 1: Hero Shot/);
-  assert.match(exported, /\[16:9, 10s, 1080p\]/);
+  assert.match(exported, /\[16:9, 10s, 1080p/);
   assert.match(exported, /Golden retriever/);
+});
+
+test('parseMarkdownToPrompts extracts 30s duration and Seedance 2.5 model', () => {
+  const content = `
+# Scene 1: Epic 30s Sequence
+[16:9, 30s, 1080p, audio, Seedance 2.5]
+A breathtaking 30-second continuous aerial shot following a soaring eagle through snowy canyons.
+  `;
+  const results = parseMarkdownToPrompts(content);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].duration, '30s');
+  assert.equal(results[0].model, 'Seedance 2.5');
+  assert.equal(results[0].resolution, '1080p');
+  assert.equal(results[0].generateAudio, true);
+});
+
+test('parseMarkdownToPrompts extracts reference image for Image-to-Video', () => {
+  const content = `
+# Scene 1: Portrait Awakening
+[16:9, 30s, 1080p]
+![character.png](https://example.com/character.png)
+The warrior statue slowly opens glowing eyes and looks up at the sky.
+  `;
+  const results = parseMarkdownToPrompts(content);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].duration, '30s');
+  assert.equal(results[0].generationMode, 'image-to-video');
+  assert.equal(results[0].referenceImage, 'https://example.com/character.png');
+  assert.equal(results[0].referenceImageName, 'character.png');
+  assert.match(results[0].prompt, /The warrior statue slowly opens/);
 });

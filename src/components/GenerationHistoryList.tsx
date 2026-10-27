@@ -274,6 +274,28 @@ export const GenerationHistoryList: React.FC<GenerationHistoryListProps> = ({
                   </div>
                 </div>
 
+                {/* Reference Image Thumbnail (if Image-to-Video) */}
+                {item.parameters.referenceImage && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-1.5">
+                    <img
+                      src={item.parameters.referenceImage}
+                      alt="Ref"
+                      className="h-10 w-14 rounded object-cover border border-zinc-700 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold text-indigo-300">Reference Image</span>
+                        <span className="font-mono text-[9px] text-zinc-400 truncate max-w-[160px]">
+                          {item.parameters.referenceImageName || 'reference.png'}
+                        </span>
+                      </div>
+                      <span className="text-[9px] text-zinc-400">
+                        Injected into Axcel Image-to-Video pipeline
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Prompt Preview */}
                 <div className="mt-2 text-zinc-300">
                   <p className={`text-[11px] leading-relaxed text-zinc-400 ${isExpanded ? '' : 'line-clamp-2'}`}>
@@ -303,16 +325,26 @@ export const GenerationHistoryList: React.FC<GenerationHistoryListProps> = ({
                 {/* Bottom Row: Video Specs & Links */}
                 <div className="mt-3 flex flex-col gap-2 pt-2 border-t border-zinc-800/60 sm:flex-row sm:items-center sm:justify-between text-[11px]">
                   {/* Parameter pills */}
-                  <div className="flex items-center gap-2 text-zinc-500 font-mono text-[10px]">
-                    <span>{item.parameters.aspectRatio}</span>
+                  <div className="flex items-center gap-2 text-zinc-500 font-mono text-[10px] flex-wrap">
+                    <span className="text-zinc-300 font-semibold">{item.parameters.model || 'Seedance 2.5'}</span>
                     <span>•</span>
-                    <span>{item.parameters.duration}</span>
+                    <span className={item.parameters.duration === '30s' ? 'text-amber-400 font-bold' : ''}>
+                      {item.parameters.duration}
+                    </span>
+                    <span>•</span>
+                    <span>{item.parameters.aspectRatio}</span>
                     <span>•</span>
                     <span>{item.parameters.resolution}</span>
                     {item.parameters.generateAudio && (
                       <>
                         <span>•</span>
                         <span className="text-emerald-400 font-sans">Audio ON</span>
+                      </>
+                    )}
+                    {item.parameters.referenceImage && (
+                      <>
+                        <span>•</span>
+                        <span className="text-indigo-400 font-sans">Image-to-Video</span>
                       </>
                     )}
                   </div>
@@ -333,16 +365,24 @@ export const GenerationHistoryList: React.FC<GenerationHistoryListProps> = ({
                       <span>{copiedId === `prompt-${item.id}` ? 'Copied' : 'Prompt'}</span>
                     </button>
 
-                    {/* Open in Axcel link */}
+                    {/* Open in Axcel link (routes to image-to-video or text-to-video) */}
                     <a
-                      href="https://axcel.cloud/video/text-to-video"
+                      href={
+                        item.parameters.referenceImage || item.parameters.generationMode === 'image-to-video'
+                          ? 'https://axcel.cloud/video/image-to-video'
+                          : 'https://axcel.cloud/video/text-to-video'
+                      }
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-zinc-400 hover:text-white transition"
-                      title="Open axcel.cloud text-to-video"
+                      title={
+                        item.parameters.referenceImage || item.parameters.generationMode === 'image-to-video'
+                          ? 'Open axcel.cloud/video/image-to-video'
+                          : 'Open axcel.cloud/video/text-to-video'
+                      }
                     >
                       <ExternalLink className="h-3 w-3 text-zinc-400" />
-                      <span>Axcel</span>
+                      <span>{item.parameters.referenceImage ? 'Axcel Img2Vid' : 'Axcel T2V'}</span>
                     </a>
 
                     {/* If completed: Watch Video Preview and Direct Download MP4 */}

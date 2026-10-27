@@ -275,11 +275,19 @@ export class VideoQueueEngine {
       error: undefined,
     };
 
+    const isImg2Vid = !!job.promptItem.referenceImage;
     this.log(
       'info',
-      `[Worker ${workerSlot}] Starting Scene ${job.promptItem.index} (Attempt ${attempt}/${this.config.maxRetries}): "${job.promptItem.title}"`,
+      `[Worker ${workerSlot}] Starting ${isImg2Vid ? 'Image-to-Video' : 'Text-to-Video'} Scene ${job.promptItem.index} (Attempt ${attempt}/${this.config.maxRetries}): "${job.promptItem.title}" [${job.promptItem.model || 'Seedance 2.5'}, ${job.promptItem.duration}]`,
       jobId
     );
+    if (isImg2Vid) {
+      this.log(
+        'info',
+        `[Worker ${workerSlot}] Injected reference image: ${job.promptItem.referenceImageName || 'reference.png'} -> axcel.cloud/video/image-to-video`,
+        jobId
+      );
+    }
     this.notify();
 
     // Record in Generation History
@@ -297,6 +305,10 @@ export class VideoQueueEngine {
         resolution: job.promptItem.resolution,
         aspectRatio: job.promptItem.aspectRatio,
         generateAudio: job.promptItem.generateAudio,
+        model: job.promptItem.model || 'Seedance 2.5',
+        generationMode: job.promptItem.generationMode || (isImg2Vid ? 'image-to-video' : 'text-to-video'),
+        referenceImage: job.promptItem.referenceImage,
+        referenceImageName: job.promptItem.referenceImageName,
       },
     };
     this.history.unshift(historyEntry);

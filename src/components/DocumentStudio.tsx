@@ -15,8 +15,11 @@ import {
   Volume2,
   VolumeX,
   Loader2,
+  Image as ImageIcon,
+  X,
+  ExternalLink,
 } from 'lucide-react';
-import { PromptItem, AspectRatio, VideoDuration, VideoResolution } from '../types';
+import { PromptItem, AspectRatio, VideoDuration, VideoResolution, VideoModel } from '../types';
 import { parseMarkdownToPrompts, exportPromptsToMarkdown } from '../utils/markdownParser';
 import { SAMPLE_SCRIPTS } from '../utils/sampleData';
 import { readDocumentFile } from '../utils/fileReader';
@@ -90,6 +93,63 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
     setRawText(exportPromptsToMarkdown(updated));
   };
 
+  const handleImageUploadForScene = (promptId: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target?.result as string;
+      const updated = prompts.map(p =>
+        p.id === promptId
+          ? {
+              ...p,
+              referenceImage: dataUrl,
+              referenceImageName: file.name,
+              generationMode: 'image-to-video' as const,
+            }
+          : p
+      );
+      onPromptsChange(updated);
+      setRawText(exportPromptsToMarkdown(updated));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImageFromScene = (promptId: string) => {
+    const updated = prompts.map(p =>
+      p.id === promptId
+        ? {
+            ...p,
+            referenceImage: undefined,
+            referenceImageName: undefined,
+            generationMode: 'text-to-video' as const,
+          }
+        : p
+    );
+    onPromptsChange(updated);
+    setRawText(exportPromptsToMarkdown(updated));
+  };
+
+  const handleAttachSampleImage = (promptId: string) => {
+    const sampleImages = [
+      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&q=80',
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
+    ];
+    const picked = sampleImages[Math.floor(Math.random() * sampleImages.length)];
+    const updated = prompts.map(p =>
+      p.id === promptId
+        ? {
+            ...p,
+            referenceImage: picked,
+            referenceImageName: 'sample_reference.jpg',
+            generationMode: 'image-to-video' as const,
+          }
+        : p
+    );
+    onPromptsChange(updated);
+    setRawText(exportPromptsToMarkdown(updated));
+  };
+
   const handleAddPrompt = () => {
     const newIndex = prompts.length + 1;
     const newItem: PromptItem = {
@@ -97,11 +157,13 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
       index: newIndex,
       title: `Scene ${newIndex}: New Video`,
       prompt: 'A cinematic drone shot flying over a scenic destination with soft golden hour lighting.',
-      duration: '5s',
-      resolution: '720p',
+      duration: '30s',
+      resolution: '1080p',
       aspectRatio: '16:9',
       generateAudio: false,
       charCount: 95,
+      model: 'Seedance 2.5',
+      generationMode: 'text-to-video',
     };
     const updated = [...prompts, newItem];
     onPromptsChange(updated);
@@ -306,7 +368,7 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
                 >
                   {/* Card Header */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 font-mono text-[10px] font-bold text-blue-400">
                         {p.index}
                       </span>
@@ -317,6 +379,21 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
                         className="bg-transparent font-semibold text-xs text-zinc-200 outline-none border-b border-transparent focus:border-blue-500"
                         placeholder="Scene Title"
                       />
+                      {p.referenceImage ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-indigo-500/15 border border-indigo-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
+                          <ImageIcon className="h-2.5 w-2.5" />
+                          <span>Image to Video</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                          <span>Text to Video</span>
+                        </span>
+                      )}
+                      {p.duration === '30s' && (
+                        <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 font-mono">
+                          30s Extended
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -331,6 +408,80 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Reference Image Box (Image-to-Video Option) */}
+                  <div className="mt-2.5 rounded-lg border border-zinc-800/80 bg-zinc-950/60 p-2.5">
+                    {p.referenceImage ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="relative group overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 h-11 w-16 shrink-0">
+                            <img
+                              src={p.referenceImage}
+                              alt={p.referenceImageName || 'Reference'}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-semibold text-indigo-400">Reference Image</span>
+                              <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[140px]">
+                                {p.referenceImageName || 'reference.png'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400">
+                              Will be injected onto <code className="text-zinc-300">axcel.cloud/video/image-to-video</code>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <label className="cursor-pointer rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white">
+                            <span>Change</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={e => e.target.files?.[0] && handleImageUploadForScene(p.id, e.target.files[0])}
+                            />
+                          </label>
+                          <button
+                            onClick={() => handleRemoveImageFromScene(p.id)}
+                            className="rounded-md border border-red-900/30 bg-red-950/20 px-2 py-1 text-[11px] text-red-400 hover:bg-red-900/40"
+                            title="Remove reference image (switch to text-to-video)"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                        <span className="text-zinc-400 flex items-center gap-1.5">
+                          <ImageIcon className="h-3.5 w-3.5 text-zinc-500" />
+                          <span>Image-to-Video mode:</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer flex items-center gap-1 rounded-md border border-dashed border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-300 hover:border-zinc-500 hover:text-white transition">
+                            <Upload className="h-3 w-3 text-zinc-400" />
+                            <span>Upload Reference Image</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={e => e.target.files?.[0] && handleImageUploadForScene(p.id, e.target.files[0])}
+                            />
+                          </label>
+                          <button
+                            onClick={() => handleAttachSampleImage(p.id)}
+                            className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-zinc-400 hover:text-zinc-200"
+                            title="Attach sample reference image"
+                          >
+                            <Sparkles className="h-3 w-3 text-indigo-400" />
+                            <span>Sample Image</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Prompt Textarea */}
@@ -349,16 +500,35 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
                     />
                   </div>
 
-                  {/* Parameter Controls (duration, resolution, ratio, audio) */}
+                  {/* Parameter Controls (model, duration, resolution, ratio, audio) */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {/* Model Select (Seedance 2.5 vs 2.0) */}
+                    <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1">
+                      <span className="text-[10px] text-zinc-400">Model:</span>
+                      <select
+                        value={p.model || (p.duration === '30s' ? 'Seedance 2.5' : 'Seedance 2.5')}
+                        onChange={e =>
+                          handleUpdatePrompt(p.id, { model: e.target.value as VideoModel })
+                        }
+                        className="bg-transparent text-zinc-200 font-medium outline-none cursor-pointer"
+                      >
+                        <option value="Seedance 2.5" className="bg-zinc-900">Seedance 2.5</option>
+                        <option value="Seedance 2.0" className="bg-zinc-900">Seedance 2.0</option>
+                      </select>
+                    </div>
+
                     {/* Duration Select */}
                     <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1">
                       <span className="text-[10px] text-zinc-400">Duration:</span>
                       <select
                         value={p.duration}
-                        onChange={e =>
-                          handleUpdatePrompt(p.id, { duration: e.target.value as VideoDuration })
-                        }
+                        onChange={e => {
+                          const dur = e.target.value as VideoDuration;
+                          handleUpdatePrompt(p.id, {
+                            duration: dur,
+                            model: dur === '30s' ? 'Seedance 2.5' : (p.model || 'Seedance 2.5'),
+                          });
+                        }}
                         className="bg-transparent text-zinc-200 outline-none cursor-pointer"
                       >
                         <option value="5s" className="bg-zinc-900">5s</option>
@@ -366,6 +536,7 @@ export const DocumentStudio: React.FC<DocumentStudioProps> = ({
                         <option value="10s" className="bg-zinc-900">10s</option>
                         <option value="12s" className="bg-zinc-900">12s</option>
                         <option value="15s" className="bg-zinc-900">15s</option>
+                        <option value="30s" className="bg-zinc-900 font-semibold text-blue-400">30s (Seedance 2.5)</option>
                       </select>
                     </div>
 

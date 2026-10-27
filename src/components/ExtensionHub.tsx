@@ -41,17 +41,18 @@ export const ExtensionHub: React.FC<ExtensionHubProps> = ({
   };
 
   const bookmarkletCode = `// Axcel Automator Quick Console Runner
-// Paste this directly into Chrome DevTools Console on https://axcel.cloud/video/text-to-video
+// Paste this directly into Chrome DevTools Console on https://axcel.cloud/video/text-to-video OR https://axcel.cloud/video/image-to-video
 (function() {
   console.log('%c🎬 Axcel Automator Injected!', 'background: #2563eb; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: bold;');
   const widgetId = 'axcel-quick-runner';
   if (document.getElementById(widgetId)) { alert('Axcel Automator already injected!'); return; }
+  const isImg2Vid = window.location.href.includes('image-to-video');
   const div = document.createElement('div');
   div.id = widgetId;
-  div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;background:#18181b;color:#f4f4f5;border:1px solid #3f3f46;border-radius:12px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);width:320px;font-family:sans-serif;font-size:12px;';
-  div.innerHTML = \`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong style="color:#60a5fa;">🎬 Axcel Automator HUD</strong><button onclick="document.getElementById('\${widgetId}').remove()" style="background:none;border:none;color:#a1a1aa;cursor:pointer;">✕</button></div><p style="color:#a1a1aa;margin-bottom:10px;">Loaded on \${window.location.host}. Supports 2 concurrent generations & 10 video batching.</p><button id="ax-quick-start" style="width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Ready to Process</button>\`;
+  div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;background:#18181b;color:#f4f4f5;border:1px solid #3f3f46;border-radius:12px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);width:330px;font-family:sans-serif;font-size:12px;';
+  div.innerHTML = \`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong style="color:#60a5fa;">🎬 Axcel Automator HUD (\${isImg2Vid ? 'Image-to-Video' : 'Text-to-Video'})</strong><button onclick="document.getElementById('\${widgetId}').remove()" style="background:none;border:none;color:#a1a1aa;cursor:pointer;">✕</button></div><p style="color:#a1a1aa;margin-bottom:10px;">Loaded on \${window.location.host}. Supports Seedance 2.5 (30s), 2 concurrent generations & 10 video batching.</p><button id="ax-quick-start" style="width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Ready to Process</button>\`;
   document.body.appendChild(div);
-  document.getElementById('ax-quick-start').onclick = () => alert('Please load your .md script from the Chrome Extension popup for full downloads API integration!');
+  document.getElementById('ax-quick-start').onclick = () => alert('Please load your .md script from the Chrome Extension popup for full downloads API & image injection integration!');
 })();`;
 
   const handleCopyBookmarklet = () => {
@@ -67,14 +68,14 @@ export const ExtensionHub: React.FC<ExtensionHubProps> = ({
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
             <Zap className="h-3.5 w-3.5" />
-            <span>Built Specifically for Axcel.cloud Text-to-Video</span>
+            <span>Built for Axcel.cloud Text-to-Video & Image-to-Video • Seedance 2.5 (30s)</span>
           </div>
 
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">
             Automate Your Axcel.cloud Video Pipeline
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-zinc-300">
-            Generate up to <b>10 videos per batch</b> from Markdown scripts with <b>2 simultaneous generations</b>. Automatically handles transient failures with instant auto-retry and downloads finished MP4 videos directly to your disk.
+            Generate up to <b>10 videos per batch</b> from Markdown scripts with <b>2 simultaneous generations</b>. Full support for <b>Text-to-Video</b> and <b>Image-to-Video</b> with reference images, <b>Seedance 2.5 30-second duration</b>, auto-retry, and direct MP4 downloads.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
